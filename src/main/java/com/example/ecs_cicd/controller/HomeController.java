@@ -9,6 +9,6 @@ public class HomeController {
 
     @GetMapping("/")
     public ResponseEntity<String> home() {
-        return ResponseEntity.ok("Welcome to ECS CI/CD!");
+        return ResponseEntity.ok("Welcome to Java App Deployment on ECS with CI/CD!");
     }
 }
