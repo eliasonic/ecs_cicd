@@ -42,7 +42,7 @@ jobs:
 
       - name: Create deployment files
         env:
-          IMAGE_URI: ${{ steps.build-image.outputs.image-uri }}
+          IMAGE_URI_OUTPUT: ${{ steps.build-image.outputs.image-uri }}
           EXECUTION_ROLE_ARN: ${{ vars.EXECUTION_ROLE_ARN }}
         run: |
           # CodeDeploy AppSpec
@@ -70,7 +70,7 @@ jobs:
             "containerDefinitions": [
               {
                 "name": "${{ env.CONTAINER_NAME }}",
-                "image": "$IMAGE_URI",
+                "image": "$IMAGE_URI_OUTPUT",
                 "essential": true,
                 "portMappings": [
                   {
