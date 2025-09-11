@@ -11,6 +11,9 @@ permissions:
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'eu-central-1' }}
   ECR_REPO: ${{ vars.ECR_REPO || 'java-web-app' }}
+  S3_BUCKET: ${{ vars.S3_BUCKET || 'artif-bkt-12345' }}
+  TASK_DEFINITION_FAMILY: ${{ vars.TASK_DEFINITION_FAMILY || 'java-web-app' }}
+  CONTAINER_NAME: ${{ vars.CONTAINER_NAME || 'java-web-app' }}
 
 jobs:
   build:
@@ -35,3 +38,59 @@ jobs:
           IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}"
           docker build -t "$IMAGE_URI:latest" .
           docker push "$IMAGE_URI:latest"
+          echo "image-uri=$IMAGE_URI:latest" >> $GITHUB_OUTPUT
+
+      - name: Create deployment files
+        env:
+          IMAGE_URI: ${{ steps.build-image.outputs.image-uri }}
+          EXECUTION_ROLE_ARN: ${{ vars.EXECUTION_ROLE_ARN }}
+        run: |
+          # CodeDeploy AppSpec
+          cat > appspec.yml << 'EOF'
+          version: 0.0
+          Resources:
+            - TargetService:
+                Type: AWS::ECS::Service
+                Properties:
+                  TaskDefinition: <TASK_DEFINITION>
+                  LoadBalancerInfo:
+                    ContainerName: "${{ env.CONTAINER_NAME }}"
+                    ContainerPort: 8080
+          EOF
+
+          # ECS Task Definition JSON
+          cat > taskdef.json << EOF
+          {
+            "family": "${{ env.TASK_DEFINITION_FAMILY }}",
+            "networkMode": "awsvpc",
+            "requiresCompatibilities": ["FARGATE"],
+            "cpu": "256",
+            "memory": "512",
+            "executionRoleArn": "$EXECUTION_ROLE_ARN",
+            "containerDefinitions": [
+              {
+                "name": "${{ env.CONTAINER_NAME }}",
+                "image": "$IMAGE_URI",
+                "essential": true,
+                "portMappings": [
+                  {
+                    "containerPort": 8080,
+                    "protocol": "tcp"
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+
+          # CodePipeline/ECR image details
+          cat > imageDetail.json << EOF
+          {
+            "ImageURI": "$IMAGE_URI"
+          }
+          EOF
+
+      - name: Create and upload deployment zip for CodePipeline
+        run: |
+          zip deployment-files.zip appspec.yml taskdef.json imageDetail.json
+          aws s3 cp deployment-files.zip s3://${{ env.S3_BUCKET }}/deployment-files.zip --region ${{ env.AWS_REGION }}
