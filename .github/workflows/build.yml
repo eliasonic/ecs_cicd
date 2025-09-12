@@ -87,7 +87,7 @@ jobs:
                   "Interval": 30,
                   "Timeout": 5,
                   "Retries": 2,
-                  StartPeriod: 60
+                  "StartPeriod": 60
                 },
                 "logConfiguration": {
                   "logDriver": "awslogs",
