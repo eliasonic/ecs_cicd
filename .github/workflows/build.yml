@@ -78,7 +78,15 @@ jobs:
                     "containerPort": 8080,
                     "protocol": "tcp"
                   }
-                ]
+                ],
+                "logConfiguration": {
+                  "logDriver": "awslogs",
+                  "options": {
+                    "awslogs-group": "/ecs/java-web-app",
+                    "awslogs-region": "${{ env.AWS_REGION }}",
+                    "awslogs-stream-prefix": "ecs"
+                  }
+                }
               }
             ]
           }
