@@ -79,6 +79,16 @@ jobs:
                     "protocol": "tcp"
                   }
                 ],
+                "HealthCheck": {
+                  "Command": [
+                    "CMD-SHELL",
+                    "curl -f http://localhost:8080/actuator/health || exit 1"
+                  ],
+                  "Interval": 30,
+                  "Timeout": 5,
+                  "Retries": 2,
+                  StartPeriod: 60
+                },
                 "logConfiguration": {
                   "logDriver": "awslogs",
                   "options": {
