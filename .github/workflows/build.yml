@@ -41,75 +41,37 @@ jobs:
           docker push "$IMAGE_URI:latest"
           echo "image-uri=$IMAGE_URI:latest" >> $GITHUB_OUTPUT
 
-      - name: Create deployment files
+      - name: Process deployment templates
         env:
           IMAGE_URI_OUTPUT: ${{ steps.build-image.outputs.image-uri }}
           EXECUTION_ROLE_ARN: ${{ vars.EXECUTION_ROLE_ARN }}
         run: |
-          # CodeDeploy AppSpec
-          cat > appspec.yml << 'EOF'
-          version: 0.0
-          Resources:
-            - TargetService:
-                Type: AWS::ECS::Service
-                Properties:
-                  TaskDefinition: <TASK_DEFINITION>
-                  LoadBalancerInfo:
-                    ContainerName: "${{ env.CONTAINER_NAME }}"
-                    ContainerPort: 8080
-          EOF
+          # Create deployment directory
+          mkdir -p deployment
+          
+          # Process appspec.yml template
+          sed \
+            -e "s|<CONTAINER_NAME>|${{ env.CONTAINER_NAME }}|g" \
+            .github/templates/appspec.yml.template > deployment/appspec.yml
+          
+          # Process taskdef.json template
+          sed \
+            -e "s|<TASK_DEFINITION_FAMILY>|${{ env.TASK_DEFINITION_FAMILY }}|g" \
+            -e "s|<EXECUTION_ROLE_ARN>|$EXECUTION_ROLE_ARN|g" \
+            -e "s|<CONTAINER_NAME>|${{ env.CONTAINER_NAME }}|g" \
+            -e "s|<IMAGE_URI>|$IMAGE_URI_OUTPUT|g" \
+            -e "s|<AWS_REGION>|${{ env.AWS_REGION }}|g" \
+            .github/templates/taskdef.json.template > deployment/taskdef.json
+          
+          # Process imageDetail.json template
+          sed \
+            -e "s|<IMAGE_URI>|$IMAGE_URI_OUTPUT|g" \
+            .github/templates/imageDetail.json.template > deployment/imageDetail.json
 
-          # ECS Task Definition JSON
-          cat > taskdef.json << EOF
-          {
-            "family": "${{ env.TASK_DEFINITION_FAMILY }}",
-            "networkMode": "awsvpc",
-            "requiresCompatibilities": ["FARGATE"],
-            "cpu": "256",
-            "memory": "512",
-            "executionRoleArn": "$EXECUTION_ROLE_ARN",
-            "containerDefinitions": [
-              {
-                "name": "${{ env.CONTAINER_NAME }}",
-                "image": "$IMAGE_URI_OUTPUT",
-                "essential": true,
-                "portMappings": [
-                  {
-                    "containerPort": 8080,
-                    "protocol": "tcp"
-                  }
-                ],
-                "healthCheck": {
-                  "command": [
-                    "CMD-SHELL",
-                    "curl -f http://localhost:8080/actuator/health || exit 1"
-                  ],
-                  "interval": 30,
-                  "timeout": 10,
-                  "retries": 3,
-                  "startPeriod": 120
-                },
-                "logConfiguration": {
-                  "logDriver": "awslogs",
-                  "options": {
-                    "awslogs-group": "/ecs/java-web-app",
-                    "awslogs-region": "${{ env.AWS_REGION }}",
-                    "awslogs-stream-prefix": "ecs"
-                  }
-                }
-              }
-            ]
-          }
-          EOF
-
-          # CodePipeline/ECR image details
-          cat > imageDetail.json << EOF
-          {
-            "ImageURI": "$IMAGE_URI"
-          }
-          EOF
-
-      - name: Create and upload deployment zip for CodePipeline
+      - name: Create and upload deployment zip to S3
         run: |
-          zip deployment-files.zip appspec.yml taskdef.json imageDetail.json
+          cd deployment
+          zip ../deployment-files.zip appspec.yml taskdef.json imageDetail.json
+          cd ..
           aws s3 cp deployment-files.zip s3://${{ env.S3_BUCKET }}/deployment-files.zip --region ${{ env.AWS_REGION }}
+          echo "Deployment package uploaded to S3"
