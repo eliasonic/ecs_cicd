@@ -11,9 +11,10 @@ permissions:
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'eu-central-1' }}
   ECR_REPO: ${{ vars.ECR_REPO || 'java-web-app' }}
-  S3_BUCKET: ${{ vars.S3_BUCKET || 'artif-bkt-12345' }}
+  ARTIFACT_BUCKET: ${{ vars.S3_BUCKET || 'artif-bkt-12345' }}
   TASK_DEFINITION_FAMILY: ${{ vars.TASK_DEFINITION_FAMILY || 'java-web-app' }}
   CONTAINER_NAME: ${{ vars.CONTAINER_NAME || 'java-web-app' }}
+  PHOTO_BUCKET: ${{ vars.PHOTO_BUCKET || 'photo-bkt-12345' }}
 
 jobs:
   build:
@@ -45,6 +46,10 @@ jobs:
         env:
           IMAGE_URI_OUTPUT: ${{ steps.build-image.outputs.image-uri }}
           EXECUTION_ROLE_ARN: ${{ vars.EXECUTION_ROLE_ARN }}
+          TASK_ROLE_ARN: ${{ vars.TASK_ROLE_ARN }}
+          DB_SECRET_ARN: ${{ vars.DB_SECRET_ARN }}
+          DB_HOST: ${{ vars.DB_HOST }}
+
         run: |
           # Create deployment directory
           mkdir -p deployment
@@ -58,9 +63,14 @@ jobs:
           sed \
             -e "s|<TASK_DEFINITION_FAMILY>|${{ env.TASK_DEFINITION_FAMILY }}|g" \
             -e "s|<EXECUTION_ROLE_ARN>|$EXECUTION_ROLE_ARN|g" \
+            -e "s|<TASK_ROLE_ARN>|$TASK_ROLE_ARN|g" \
             -e "s|<CONTAINER_NAME>|${{ env.CONTAINER_NAME }}|g" \
             -e "s|<IMAGE_URI>|$IMAGE_URI_OUTPUT|g" \
             -e "s|<AWS_REGION>|${{ env.AWS_REGION }}|g" \
+            -e "s|<DB_HOST>|$DB_HOST|g" \
+            -e "s|<DB_SECRET_ARN>|$DB_SECRET_ARN|g" \
+            -e "s|<PHOTO_BUCKET>|${{ env.PHOTO_BUCKET }}|g" \
+            
             .github/templates/taskdef.json.template > deployment/taskdef.json
           
           # Process imageDetail.json template
@@ -73,5 +83,5 @@ jobs:
           cd deployment
           zip ../deployment-files.zip appspec.yml taskdef.json imageDetail.json
           cd ..
-          aws s3 cp deployment-files.zip s3://${{ env.S3_BUCKET }}/deployment-files.zip --region ${{ env.AWS_REGION }}
+          aws s3 cp deployment-files.zip s3://${{ env.ARTIFACT_BUCKET }}/deployment-files.zip --region ${{ env.AWS_REGION }}
           echo "Deployment package uploaded to S3"
