@@ -70,7 +70,6 @@ jobs:
             -e "s|<DB_HOST>|$DB_HOST|g" \
             -e "s|<DB_SECRET_ARN>|$DB_SECRET_ARN|g" \
             -e "s|<PHOTO_BUCKET>|${{ env.PHOTO_BUCKET }}|g" \
-            
             .github/templates/taskdef.json.template > deployment/taskdef.json
           
           # Process imageDetail.json template
