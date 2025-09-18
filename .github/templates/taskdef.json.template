@@ -42,7 +42,7 @@
         },
         {
           "name": "DB_PORT",
-          "value": 5432
+          "value": "5432"
         },
         {
           "name": "AWS_S3_BUCKET",
